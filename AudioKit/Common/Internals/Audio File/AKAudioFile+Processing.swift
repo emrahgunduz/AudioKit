@@ -55,6 +55,61 @@ extension AKAudioFile {
         return try AKAudioFile(forReading: outputFile.url)
     }
 
+    /// Normalize an AKAudioFile to have a peak of newMaxLevel dB.
+    ///
+    /// - Parameters:
+    ///   - baseDir: where the file will be located, can be set to "resources",  "documents" or "temp"
+    ///   - name: the name of the file without its extension (String).  If none is given, a unique random name is used.
+    ///   - newMaxLevel: max level targeted as a Float value (default if 0 dB)
+    ///
+    /// - returns: An AKAudioFile, or nil if init failed.
+    ///
+    @objc public func normalized(baseDir: BaseDirectoryObjC,
+                                 name: String = UUID().uuidString,
+                                 newMaxLevel: Float = 0.0 ) throws -> AKAudioFile {
+
+        var baseDirSwift:BaseDirectory
+        switch (baseDir) {
+            case  .temp:
+                baseDirSwift = .temp
+                  break;
+            case .resources:
+                baseDirSwift = .resources
+                 break
+            case .documents:
+                baseDirSwift = .documents
+                 break
+        }
+
+        let level = self.maxLevel
+        var outputFile = try AKAudioFile (writeIn: baseDirSwift, name: name)
+
+        if self.samplesCount == 0 {
+            AKLog("WARNING AKAudioFile: cannot normalize an empty file")
+            return try AKAudioFile(forReading: outputFile.url)
+        }
+
+        if level == Float.leastNormalMagnitude {
+            AKLog("WARNING AKAudioFile: cannot normalize a silent file")
+            return try AKAudioFile(forReading: outputFile.url)
+        }
+
+        let gainFactor = Float( pow(10.0, newMaxLevel / 10.0) / pow(10.0, level / 10.0))
+
+        let arrays = self.floatChannelData ?? [[]]
+
+        var newArrays: [[Float]] = []
+        for array in arrays {
+            let newArray = array.map { $0 * gainFactor }
+            newArrays.append(newArray)
+        }
+
+        outputFile = try AKAudioFile(createFileFromFloats: newArrays,
+            baseDir: baseDirSwift,
+            name: name)
+        return try AKAudioFile(forReading: outputFile.url)
+    }
+
     /// Returns an AKAudioFile with audio reversed (will playback in reverse from end to beginning).
     ///
     /// - Parameters:

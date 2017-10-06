@@ -169,6 +169,12 @@ extension AVAudioCommonFormat: CustomStringConvertible {
 
     // MARK: - embedded enums
 
+    @objc public enum BaseDirectoryObjC:UInt {
+        case temp
+        case documents
+        case resources
+    }
+
     /// Common places for files
     ///
     /// - Temp:      Temp Directory
