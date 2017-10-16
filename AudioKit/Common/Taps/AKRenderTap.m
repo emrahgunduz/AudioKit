@@ -10,6 +10,7 @@
 #import "TPCircularBuffer+AudioBufferList.h"
 #import <pthread/pthread.h>
 
+#define RLog(__FORMAT__, ...) NSLog((@"%s [Line %d] " __FORMAT__), __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__)
 
 @implementation AKRenderTap{
     AudioUnit _audioUnit;
@@ -45,7 +46,8 @@
 
 
 - (void)dealloc {
-    
+    RLog (@"");
+
     OSStatus status = AudioUnitRemoveRenderNotify(_audioUnit, renderNotify, (__bridge void *)_renderNotifyBlock);
     if (status) {
         printf("%s OSStatus %d %d\n",NSStringFromClass(self.class).UTF8String, (int)status, __LINE__);

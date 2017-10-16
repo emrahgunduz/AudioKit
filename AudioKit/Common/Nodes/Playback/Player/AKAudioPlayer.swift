@@ -333,7 +333,7 @@ open class AKAudioPlayer: AKNode, AKToggleable {
     }
 
     /// Pause playback
-    open func pause() {
+    @objc open func pause() {
         if playing {
             if ❗️paused {
                 lastCurrentTime = currentTime
@@ -349,7 +349,7 @@ open class AKAudioPlayer: AKNode, AKToggleable {
     }
 
     /// Restart playback from current position
-    open func resume() {
+    @objc open func resume() {
         if paused {
             self.play()
         }
