@@ -26,6 +26,10 @@ open class AKAudioPlayer: AKNode, AKToggleable {
 
     // MARK: - Properties
 
+    @objc open func internalPlayerIs() -> AVAudioPlayerNode {
+        return internalPlayer
+    }
+
     /// Buffer to be palyed
     @objc open dynamic var audioFileBuffer: AVAudioPCMBuffer?
 
