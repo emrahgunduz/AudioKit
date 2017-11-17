@@ -398,7 +398,7 @@ open class AKAudioPlayer: AKNode, AKToggleable {
     }
 
     /// Default play that will use the previously set startTime and endTime properties or the full file if both are 0
-    open func play() {
+    @objc open func play() {
         play(from: self.startTime, to: self.endTime, avTime: nil)
     }
 
@@ -416,7 +416,7 @@ open class AKAudioPlayer: AKNode, AKToggleable {
     ///    - scheduledTime: use this when scheduled playback doesn't need to be in sync with other players
     ///         otherwise use the avTime signature.
     ///
-    open func play(from startTime: Double, to endTime: Double, when scheduledTime: Double) {
+    @objc open func play(from startTime: Double, to endTime: Double, when scheduledTime: Double) {
         let hostTime = mach_absolute_time()
         let avTime = AKAudioPlayer.secondsToAVAudioTime(hostTime: hostTime, time: scheduledTime)
         play(from: startTime, to: endTime, avTime: avTime)
