@@ -70,10 +70,6 @@ open class AKMixer: AKNode, AKToggleable, AKInput {
             volume = 0
         }
     }
-  
-    @objc open override func detach() {
-        super.detach()
-    }
 
     /// Detach
     @objc open override func detach() {
