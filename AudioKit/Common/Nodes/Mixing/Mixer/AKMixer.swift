@@ -30,6 +30,10 @@ open class AKMixer: AKNode, AKToggleable, AKInput {
     @objc public override init() {
         super.init(avAudioNode: mixerAU, attach: true)
     }
+  
+    @objc open func internalMixer () -> AVAudioMixerNode {
+      return self.mixerAU;
+    }
 
     /// Initialize the mixer node with multiple inputs
     ///
