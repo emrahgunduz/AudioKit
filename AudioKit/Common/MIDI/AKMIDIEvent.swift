@@ -3,7 +3,7 @@
 //  AudioKit
 //
 //  Created by Jeff Cooper, revision history on Github.
-//  Copyright © 2017 Aurelius Prochazka. All rights reserved.
+//  Copyright © 2018 AudioKit. All rights reserved.
 //
 
 import CoreMIDI
@@ -44,31 +44,56 @@ public struct AKMIDIEvent {
     // MARK: - Properties
 
     /// Internal data
-    public var internalData = [MIDIByte](zeros: 128)
+    public var internalData = [MIDIByte](zeros: 256)
+
+    /// Internal MIDIByte-sized packets - in development / not used yet
+    public var internalPackets: [[MIDIByte]] {
+        var splitData = [[MIDIByte]]()
+        let byteLimit = Int(internalData.count / 256)
+        for i in 0...byteLimit {
+            let arrayStart = i * 256
+            let arrayEnd: Int = min(Int(arrayStart + 256), Int(internalData.count))
+            let tempData = Array(internalData[arrayStart..<arrayEnd])
+            splitData.append(tempData)
+        }
+        return splitData
+    }
 
     /// The length in bytes for this MIDI message (1 to 3 bytes)
-    var length: MIDIByte?
+    var length: Int = 0
 
     /// Status
     public var status: AKMIDIStatus? {
-        let status = internalData[0] >> 4
-        return AKMIDIStatus(rawValue: Int(status))
+        if let statusByte = internalData.first {
+            let status = statusByte >> 4
+            if statusByte == AKMIDISystemCommand.sysex.rawValue,
+                !internalData.contains(AKMIDISystemCommand.sysexEnd.rawValue) {
+                return nil //incomplete sysex
+            } else {
+                return AKMIDIStatus(rawValue: Int(status))
+            }
+        }
+        return nil
     }
 
     /// System Command
     public var command: AKMIDISystemCommand? {
-        let status = internalData[0] >> 4
-        if status < 15 {
-            return .none
+        if let statusByte = internalData.first {
+            let status = statusByte >> 4
+            if status < 15 {
+                return .none
+            }
+            return AKMIDISystemCommand(rawValue: statusByte)
         }
-        return AKMIDISystemCommand(rawValue: internalData[0])
+        return nil
     }
 
     /// MIDI Channel
     public var channel: MIDIChannel? {
-        let status = internalData[0] >> 4
-        if status < 16 {
-            return internalData[0].lowbit()
+        if let statusByte = internalData.first {
+            if let channel = channelFrom(rawByte: statusByte) {
+                return channel
+            }
         }
         return nil
     }
@@ -77,12 +102,12 @@ public struct AKMIDIEvent {
         return AKMIDIStatus(rawValue: Int(rawByte >> 4))
     }
 
-    func channelFrom(rawByte: MIDIByte) -> MIDIChannel {
+    func channelFrom(rawByte: MIDIByte) -> MIDIChannel? {
         let status = rawByte >> 4
         if status < 16 {
             return MIDIChannel(rawByte.lowbit())
         }
-        return 0
+        return nil
     }
 
     /// MIDI Note Number
@@ -103,7 +128,8 @@ public struct AKMIDIEvent {
         return internalData[2]
     }
 
-    var data: MIDIWord {
+    /// Representation of the MIDI data as a MIDI word 0-16383
+    public var wordData: MIDIWord {
         if internalData.count < 2 {
             return 0
         }
@@ -133,27 +159,20 @@ public struct AKMIDIEvent {
                          byte2: packet.data.2)
             }
         } else {
-
             if packet.isSysex {
                 internalData = [] //reset internalData
-                var computedLength = MIDIByte(0)
                 //voodoo
-                let mirrorData = Mirror(reflecting: packet.data)
-                for (_, value) in mirrorData.children {
-                    if computedLength < 255 {
-                        computedLength += 1
-                    }
-                    guard let byte = value as? MIDIByte else {
-                        AKLog("unable to create sysex midi byte")
-                        return
-                    }
-                    internalData.append(byte)
-                    if byte == 247 {
-                        break
+                if let midiBytes = AKMIDIEvent.decode(packet: packet) {
+                    AudioKit.midi.startReceivingSysex(with: midiBytes)
+                    internalData += midiBytes
+                    if let sysexEndIndex = midiBytes.index(of: AKMIDISystemCommand.sysexEnd.rawValue) {
+                        setLength(sysexEndIndex + 1)
+                        AudioKit.midi.stopReceivingSysex()
+                    } else {
+                        internalData.removeAll()
+                        setLength(0)
                     }
                 }
-                setLength(computedLength)
-
             } else {
                 if let cmd = packet.command {
                     fillData(command: cmd, byte1: packet.data.1, byte2: packet.data.2)
@@ -162,7 +181,7 @@ public struct AKMIDIEvent {
                 }
             }
         }
-        internalData = Array(internalData.prefix(Int(length!)))
+        internalData = Array(internalData.prefix(length))
     }
 
     /// Generate array of MIDI events from Bluetooth data
@@ -176,7 +195,7 @@ public struct AKMIDIEvent {
         if bluetoothData.count > 1 {
             var rawEvents: [[MIDIByte]] = []
             if bluetoothData[1] < 128 {
-                //continuation of sysex from previous packet - handle separately 
+                //continuation of sysex from previous packet - handle separately
                 //(probably needs a whole bluetooth MIDI class so we can see the previous packets)
             } else {
                 var rawEvent: [MIDIByte] = []
@@ -221,21 +240,25 @@ public struct AKMIDIEvent {
     ///   - data:  [MIDIByte] bluetooth packet
     ///
     public init(data: [MIDIByte]) {
-        if let command = AKMIDISystemCommand(rawValue: data[0]) {
+        if AudioKit.midi.isReceivingSysex {
+            if let sysexEndIndex = data.index(of: AKMIDISystemCommand.sysexEnd.rawValue) {
+                internalData = Array(data[0...sysexEndIndex])
+            }
+        } else if let command = AKMIDISystemCommand(rawValue: data[0]) {
             internalData = []
             // is sys command
             if command == .sysex {
                 for byte in data {
                     internalData.append(byte)
                 }
-                length = MIDIByte(internalData.count)
+                length = internalData.count
             } else {
                 fillData(command: command, byte1: data[1], byte2: data[2])
             }
         } else if let status = statusFrom(rawByte: data[0]) {
             // is regular MIDI status
             let channel = channelFrom(rawByte: data[0])
-            fillData(status: status, channel: channel, byte1: data[1], byte2: data[2])
+            fillData(status: status, channel: channel ?? 0, byte1: data[1], byte2: data[2])
         }
     }
 
@@ -255,6 +278,9 @@ public struct AKMIDIEvent {
                                        channel: MIDIChannel,
                                        byte1: MIDIByte,
                                        byte2: MIDIByte) {
+        if internalData.count < 3 {
+            internalData = [0, 0, 0]
+        }
         internalData[0] = MIDIByte(status.rawValue << 4) | MIDIByte(channel.lowbit())
         internalData[1] = byte1.lower7bits()
         internalData[2] = byte2.lower7bits()
@@ -287,17 +313,23 @@ public struct AKMIDIEvent {
             AKLog("sysex")
             break
         case .songPosition:
+            while internalData.count < 3 {
+                internalData.append(0)
+            }
             internalData[1] = byte1.lower7bits()
             internalData[2] = byte2.lower7bits()
             setLength(3)
         case .songSelect:
+            while internalData.count < 2 {
+                internalData.append(0)
+            }
             internalData[1] = byte1.lower7bits()
             setLength(2)
         default:
             setLength(1)
         }
-        if let existingLength = length {
-            internalData = Array(internalData.prefix(Int(existingLength)))
+        if length > 0 {
+            internalData = Array(internalData.prefix(length))
         }
     }
 
@@ -396,10 +428,35 @@ public struct AKMIDIEvent {
     }
 
     private mutating func setLength(_ newLength: Int) {
-        setLength(MIDIByte(newLength))
-    }
-    private mutating func setLength(_ newLength: MIDIByte) {
         length = newLength
-        internalData = Array(internalData[0..<Int(length!)])
+        internalData = Array(internalData[0..<length])
+    }
+
+    static func appendIncomingSysex(packet: MIDIPacket) -> AKMIDIEvent? {
+        if let midiBytes = AKMIDIEvent.decode(packet: packet) {
+            AudioKit.midi.incomingSysex += midiBytes
+            if midiBytes.contains(AKMIDISystemCommand.sysexEnd.rawValue) {
+                let sysexEvent = AKMIDIEvent(data: AudioKit.midi.incomingSysex)
+                AudioKit.midi.stopReceivingSysex()
+                return sysexEvent
+            }
+        }
+        return nil
+    }
+    static func decode(packet: MIDIPacket) -> [MIDIByte]? {
+        var outBytes = [MIDIByte]()
+        var computedLength = 0
+        let mirrorData = Mirror(reflecting: packet.data)
+        for (_, value) in mirrorData.children {
+            if computedLength < 256 {
+                computedLength += 1
+            }
+            guard let byte = value as? MIDIByte else {
+                AKLog("unable to create sysex midi byte")
+                return nil
+            }
+            outBytes.append(byte)
+        }
+        return outBytes
     }
 }

@@ -3,7 +3,7 @@
 //  AudioKit
 //
 //  Created by Laurent Veliscek, revision history on Github.
-//  Copyright © 2017 Aurelius Prochazka. All rights reserved.
+//  Copyright © 2018 AudioKit. All rights reserved.
 //
 //
 //  IMPORTANT: Any AKAudioFile process will output a .caf AKAudioFile
@@ -198,7 +198,7 @@ extension AKAudioFile {
                     value: "Couldn't match source file format with appended file format",
                     comment: "")
             ]
-            throw NSError(domain: "AKAudioFile ASync Process Unknown Error", code: 0, userInfo: userInfo as? [String : Any])
+            throw NSError(domain: "AKAudioFile ASync Process Unknown Error", code: 0, userInfo: userInfo as? [String: Any])
         }
 
         let outputFile = try AKAudioFile (writeIn: baseDir, name: name)

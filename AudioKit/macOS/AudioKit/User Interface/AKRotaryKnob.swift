@@ -174,13 +174,13 @@ public enum AKRotaryKnobStyle {
 
         let textColor = textColorForTheme()
 
-        let nameLabelFontAttributes = [NSAttributedStringKey.font: NSFont.boldSystemFont(ofSize: fontSize),
-                                       NSAttributedStringKey.foregroundColor: textColor,
-                                       NSAttributedStringKey.paragraphStyle: nameLabelStyle]
+        let nameLabelFontAttributes = [NSAttributedString.Key.font: NSFont.boldSystemFont(ofSize: fontSize),
+                                       NSAttributedString.Key.foregroundColor: textColor,
+                                       NSAttributedString.Key.paragraphStyle: nameLabelStyle]
 
         let nameLabelTextHeight: CGFloat = NSString(string: propertyName).boundingRect(
             with: CGSize(width: width, height: CGFloat.infinity),
-            options: NSString.DrawingOptions.usesLineFragmentOrigin,
+            options: .usesLineFragmentOrigin,
             attributes: nameLabelFontAttributes).size.height
         context.saveGState()
 
@@ -216,7 +216,9 @@ public enum AKRotaryKnobStyle {
         let knobPath: NSBezierPath = {
             switch self.knobStyle {
             case .round:
-                return NSBezierPath(roundedRect: knobRect, xRadius: knobDiameter / 2.0, yRadius: knobDiameter / 2.0)
+                return NSBezierPath(roundedRect: knobRect,
+                                    xRadius: knobDiameter / 2.0,
+                                    yRadius: knobDiameter / 2.0)
             case .polygon (let numberOfSides, let curvature):
                 return bezierPathWithPolygonInRect(
                     knobRect,
@@ -274,14 +276,14 @@ public enum AKRotaryKnobStyle {
             let valueLabelStyle = NSMutableParagraphStyle()
             valueLabelStyle.alignment = .center
 
-            let valueLabelFontAttributes = [NSAttributedStringKey.font: NSFont.boldSystemFont(ofSize: bubbleFontSize),
-                                            NSAttributedStringKey.foregroundColor: textColor,
-                                            NSAttributedStringKey.paragraphStyle: valueLabelStyle]
+            let valueLabelFontAttributes = [NSAttributedString.Key.font: NSFont.boldSystemFont(ofSize: bubbleFontSize),
+                                            NSAttributedString.Key.foregroundColor: textColor,
+                                            NSAttributedString.Key.paragraphStyle: valueLabelStyle]
 
             let valueLabelInset: CGRect = valueLabelRect.insetBy(dx: 0, dy: 0)
             let valueLabelTextSize = NSString(string: currentValueText).boundingRect(
                 with: CGSize(width: valueLabelInset.width, height: CGFloat.infinity),
-                options: NSString.DrawingOptions.usesLineFragmentOrigin,
+                options: .usesLineFragmentOrigin,
                 attributes: valueLabelFontAttributes).size
 
             let bubbleSize = CGSize(width: valueLabelTextSize.width + AKRotaryKnob.bubblePadding.width,

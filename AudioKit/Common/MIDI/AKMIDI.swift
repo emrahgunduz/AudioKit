@@ -3,7 +3,7 @@
 //  AudioKit
 //
 //  Created by Jeff Cooper, revision history on Github.
-//  Copyright © 2017 Aurelius Prochazka. All rights reserved.
+//  Copyright © 2018 AudioKit. All rights reserved.
 //
 
 import CoreMIDI
@@ -12,13 +12,14 @@ import CoreMIDI
 ///
 /// You add MIDI listeners like this:
 /// ```
-/// var midiIn = AKMIDI()
+/// var midi = AudioKit.midi
 /// midi.openInput()
 /// midi.addListener(someClass)
 /// ```
 /// ...where someClass conforms to the AKMIDIListener protocol
 ///
 /// You then implement the methods you need from AKMIDIListener and use the data how you need.
+///
 open class AKMIDI {
 
     // MARK: - Properties
@@ -58,12 +59,13 @@ open class AKMIDI {
     // MARK: - Initialization
 
     /// Initialize the AKMIDI system
-    public init() {
+    @objc public init() {
+        AKLog("Initializing MIDI")
 
         #if os(iOS)
-            MIDINetworkSession.default().isEnabled = true
-            MIDINetworkSession.default().connectionPolicy =
-                MIDINetworkConnectionPolicy.anyone
+        MIDINetworkSession.default().isEnabled = true
+        MIDINetworkSession.default().connectionPolicy =
+            MIDINetworkConnectionPolicy.anyone
         #endif
 
         if client == 0 {
@@ -83,8 +85,9 @@ open class AKMIDI {
 
     // MARK: - Virtual MIDI
 
-    /// Create set of virtual MIDI ports
+    /// Create set of virtual input and output MIDI ports
     open func createVirtualPorts(_ uniqueID: Int32 = 2_000_000, name: String? = nil) {
+        AKLog("Creating virtual input and output ports")
         destroyVirtualPorts()
         createVirtualInputPort(uniqueID, name: name)
         createVirtualOutputPort(uniqueID, name: name)
@@ -92,49 +95,82 @@ open class AKMIDI {
 
     /// Create a virtual MIDI input port
     open func createVirtualInputPort(_ uniqueID: Int32 = 2_000_000, name: String? = nil) {
-        destroyVirtualPorts()
-        let virtualPortname = ((name != nil) ? name! : String(clientName))
+        destroyVirtualInputPort()
+        let virtualPortname = name ?? String(clientName)
 
-        let result = MIDIDestinationCreateWithBlock(client,
-                                                    virtualPortname as CFString,
-                                                    &virtualInput) { packetList, _ in
-            for packet in packetList.pointee {
-                // a Core MIDI packet may contain multiple MIDI events
-                for event in packet {
-                    self.handleMIDIMessage(event)
+        let result = MIDIDestinationCreateWithBlock(
+            client,
+            virtualPortname as CFString,
+            &virtualInput) { packetList, _ in
+                for packet in packetList.pointee {
+                    // a Core MIDI packet may contain multiple MIDI events
+                    for event in packet {
+                        self.handleMIDIMessage(event)
+                    }
                 }
-            }
         }
 
         if result == noErr {
             MIDIObjectSetIntegerProperty(virtualInput, kMIDIPropertyUniqueID, uniqueID)
         } else {
-            AKLog("Error creatervirt dest: \(virtualPortname) -- \(virtualInput)")
+            AKLog("Error Creating Virtual Input Port: \(virtualPortname) -- \(virtualInput)")
         }
     }
 
     /// Create a virtual MIDI output port
     open func createVirtualOutputPort(_ uniqueID: Int32 = 2_000_000, name: String? = nil) {
-        let virtualPortname = ((name != nil) ? name! : String(clientName))
+        destroyVirtualOutputPort()
+        let virtualPortname = name ?? String(clientName)
 
         let result = MIDISourceCreate(client, virtualPortname as CFString, &virtualOutput)
         if result == noErr {
             MIDIObjectSetIntegerProperty(virtualInput, kMIDIPropertyUniqueID, uniqueID + 1)
         } else {
-            AKLog("Error creating virtual source: \(virtualPortname) -- \(virtualOutput)")
+            AKLog("Error Creating Virtual Output Port: \(virtualPortname) -- \(virtualOutput)")
         }
     }
 
     /// Discard all virtual ports
     open func destroyVirtualPorts() {
-        if virtualInput != 0 {
-            MIDIEndpointDispose(virtualInput)
-            virtualInput = 0
-        }
-
-        if virtualOutput != 0 {
-            MIDIEndpointDispose(virtualOutput)
-            virtualOutput = 0
-        }
+        destroyVirtualInputPort()
+        destroyVirtualOutputPort()
     }
+
+    /// Closes the virtual input port, if created one already.
+    ///
+    /// - Returns: Returns true if virtual input closed.
+    ///
+    @discardableResult open func destroyVirtualInputPort() -> Bool {
+        if virtualInput != 0 {
+            if MIDIEndpointDispose(virtualInput) == noErr {
+                virtualInput = 0
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Closes the virtual output port, if created one already.
+    ///
+    /// - Returns: Returns true if virtual output closed.
+    ///
+    @discardableResult open func destroyVirtualOutputPort() -> Bool {
+        if virtualOutput != 0 {
+            if MIDIEndpointDispose(virtualOutput) == noErr {
+                virtualOutput = 0
+                return true
+            }
+        }
+        return false
+    }
+
+    internal var isReceivingSysex: Bool = false
+    func startReceivingSysex(with midiBytes: [MIDIByte]) {
+        isReceivingSysex = true
+        incomingSysex = midiBytes
+    }
+    func stopReceivingSysex() {
+        isReceivingSysex = false
+    }
+    var incomingSysex = [MIDIByte]()
 }

@@ -15,7 +15,7 @@ var division = 1
 
 var callbacker = AKCallbackInstrument { status, note, _ in
     if status == .noteOn {
-        print("Start Note \(note) at \(sequencer.currentPosition.seconds)")
+        AKLog("Start Note \(note) at \(sequencer.currentPosition.seconds)")
     }
 }
 
@@ -37,7 +37,7 @@ sequencer.setTempo(tempo)
 
 // We must link the clock's output to AudioKit (even if we don't need the sound)
 //AudioKit.output = callbacker
-//AudioKit.start()
+//try AudioKit.start()
 
 //: Create a simple user interface
 import AudioKitUI
