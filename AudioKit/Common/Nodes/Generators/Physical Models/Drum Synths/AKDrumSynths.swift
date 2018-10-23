@@ -15,7 +15,7 @@ open class AKSynthKick: AKMIDIInstrument {
     /// Create the synth kick voice
     ///
     /// - Parameter midiInputName: Name of the instrument's MIDI input.
-    public override init(midiInputName: String? = nil) {
+    @objc public override init(midiInputName: String? = nil) {
 
         generator = AKOperationGenerator { _ in
             let frequency = AKOperation.lineSegment(trigger: AKOperation.trigger, start: 120, end: 40, duration: 0.03)
@@ -28,19 +28,19 @@ open class AKSynthKick: AKMIDIInstrument {
         filter.resonance = 0.00
 
         super.init(midiInputName: midiInputName)
-        avAudioNode = filter.avAudioNode
+        avAudioUnit = filter.avAudioUnit
         generator.start()
     }
 
     /// Function to start, play, or activate the node, all do the same thing
-    open override func play(noteNumber: MIDINoteNumber, velocity: MIDIVelocity) {
+    @objc open override func play(noteNumber: MIDINoteNumber, velocity: MIDIVelocity) {
         filter.cutoffFrequency = (Double(velocity) / 127.0 * 366.0) + 300.0
         filter.resonance = 1.0 - Double(velocity) / 127.0
         generator.trigger()
     }
 
     /// Unneeded stop function since the sounds all decay quickly
-    open override func stop(noteNumber: MIDINoteNumber) {
+    @objc open override func stop(noteNumber: MIDINoteNumber) {
         // Unneeded
     }
 }
@@ -70,7 +70,7 @@ open class AKSynthSnare: AKMIDIInstrument {
         filter.cutoffFrequency = 1_666
 
         super.init()
-        avAudioNode = filter.avAudioNode
+        avAudioUnit = filter.avAudioUnit
         generator.start()
     }
 
@@ -86,13 +86,13 @@ open class AKSynthSnare: AKMIDIInstrument {
     }
 
     /// Function to start, play, or activate the node, all do the same thing
-    open override func play(noteNumber: MIDINoteNumber, velocity: MIDIVelocity) {
+    @objc open override func play(noteNumber: MIDINoteNumber, velocity: MIDIVelocity) {
         cutoff = (Double(velocity) / 127.0 * 1_600.0) + 300.0
         generator.trigger()
     }
 
     /// Unneeded stop function since the sounds all decay quickly
-    open override func stop(noteNumber: MIDINoteNumber) {
+    @objc open override func stop(noteNumber: MIDINoteNumber) {
         // Unneeded
     }
 }

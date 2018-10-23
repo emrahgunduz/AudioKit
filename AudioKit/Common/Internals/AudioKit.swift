@@ -20,44 +20,64 @@ public typealias AKCallback = () -> Void
 /// Top level AudioKit managing class
 @objc open class AudioKit: NSObject {
 
+    #if !os(macOS)
+    static let deviceSampleRate = AVAudioSession.sharedInstance().sampleRate
+    #else
+    static let deviceSampleRate: Double = 44_100
+    #endif
+
     // MARK: - Internal audio engine mechanics
 
     /// Reference to the AV Audio Engine
-    @objc open static var engine = AVAudioEngine()
+    @objc public static internal(set) var engine: AVAudioEngine {
+        get {
+            _ = AudioKit.deviceSampleRate // read the original sample rate before any reference to AVAudioEngine happens, so value is retained
+            return _engine
+        }
+        set {
+            _engine = newValue
+        }
+    }
+
+    static internal(set) var _engine = AVAudioEngine()
 
     /// Reference to singleton MIDI
 
     #if !os(tvOS)
-    open static let midi = AKMIDI()
+    public static let midi = AKMIDI()
     #endif
 
     @objc static var finalMixer = AKMixer()
 
-    /// Notification observers
-    internal static var notificationObservers: [Any] = []
-
     // MARK: - Device Management
-    
+
     /// An audio output operation that most applications will need to use last
-    @objc open static var output: AKNode? {
+    @objc public static var output: AKNode? {
         didSet {
             do {
                 try updateSessionCategoryAndOptions()
                 output?.connect(to: finalMixer)
                 engine.connect(finalMixer.avAudioNode, to: engine.outputNode)
-            } catch {
+
+                } catch {
                 AKLog("Could not set output: \(error)")
             }
         }
     }
 
+    #if os(macOS)
+    /// Enumerate the list of available devices.
+    @objc public static var devices: [AKDevice]? {
+        EZAudioUtilities.setShouldExitOnCheckResultFail(false)
+        return EZAudioDevice.devices().map { AKDevice(ezAudioDevice: $0 as! EZAudioDevice) }
+    }
+    #endif
+
     /// Enumerate the list of available input devices.
-    @objc open static var inputDevices: [AKDevice]? {
+    @objc public static var inputDevices: [AKDevice]? {
         #if os(macOS)
             EZAudioUtilities.setShouldExitOnCheckResultFail(false)
-            return EZAudioDevice.inputDevices().map {
-                AKDevice(name: ($0 as AnyObject).name, deviceID: ($0 as AnyObject).deviceID)
-            }
+            return EZAudioDevice.inputDevices().map { AKDevice(ezAudioDevice: $0 as! EZAudioDevice) }
         #else
             var returnDevices = [AKDevice]()
             if let devices = AVAudioSession.sharedInstance().availableInputs {
@@ -78,12 +98,10 @@ public typealias AKCallback = () -> Void
     }
 
     /// Enumerate the list of available output devices.
-    @objc open static var outputDevices: [AKDevice]? {
+    @objc public static var outputDevices: [AKDevice]? {
         #if os(macOS)
             EZAudioUtilities.setShouldExitOnCheckResultFail(false)
-            return EZAudioDevice.outputDevices().map {
-                AKDevice(name: ($0 as AnyObject).name, deviceID: ($0 as AnyObject).deviceID)
-            }
+            return EZAudioDevice.outputDevices().map { AKDevice(ezAudioDevice: $0 as! EZAudioDevice) }
         #else
             let devs = AVAudioSession.sharedInstance().currentRoute.outputs
             if devs.isNotEmpty {
@@ -98,7 +116,7 @@ public typealias AKCallback = () -> Void
     }
 
     /// The name of the current input device, if available.
-    @objc open static var inputDevice: AKDevice? {
+    @objc public static var inputDevice: AKDevice? {
         #if os(macOS)
             if let dev = EZAudioDevice.currentInput() {
                 return AKDevice(name: dev.name, deviceID: dev.deviceID)
@@ -121,7 +139,7 @@ public typealias AKCallback = () -> Void
     }
 
     /// The name of the current output device, if available.
-    @objc open static var outputDevice: AKDevice? {
+    @objc public static var outputDevice: AKDevice? {
         #if os(macOS)
             if let dev = EZAudioDevice.currentOutput() {
                 return AKDevice(name: dev.name, deviceID: dev.deviceID)
@@ -136,8 +154,8 @@ public typealias AKCallback = () -> Void
         return nil
     }
 
-    /// Change the preferred input device, giving it one of the names from the list of available inputs.
-    @objc open static func setInputDevice(_ input: AKDevice) throws {
+        /// Change the preferred input device, giving it one of the names from the list of available inputs.
+    @objc public static func setInputDevice(_ input: AKDevice) throws {
         #if os(macOS)
             try AKTry {
                 var address = AudioObjectPropertyAddress(
@@ -189,7 +207,7 @@ public typealias AKCallback = () -> Void
     }
 
     /// Change the preferred output device, giving it one of the names from the list of available output.
-    @objc open static func setOutputDevice(_ output: AKDevice) throws {
+    @objc public static func setOutputDevice(_ output: AKDevice) throws {
         #if os(macOS)
             try AKTry {
                 var id = output.deviceID
@@ -209,18 +227,7 @@ public typealias AKCallback = () -> Void
     // MARK: - Disconnect node inputs
 
     /// Disconnect all inputs
-    @objc open static func disconnectAllInputs() {
+    @objc public static func disconnectAllInputs() {
         engine.disconnectNodeInput(finalMixer.avAudioNode)
-    }
-
-    // MARK: - Deinitialization
-
-    deinit {
-        #if os(iOS)
-            NotificationCenter.default.removeObserver(
-                self,
-                name: .AKEngineRestartedAfterRouteChange,
-                object: nil)
-        #endif
     }
 }

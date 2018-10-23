@@ -46,7 +46,7 @@ class AudiobusCompatibleSequencer {
             AKSettings.playbackWhileMuted = true
             try AudioKit.start()
         } catch {
-            print("Couldn't start Audiokit")
+            AKLog("Couldn't start Audiokit")
         }
     }
 
@@ -55,7 +55,7 @@ class AudiobusCompatibleSequencer {
         Audiobus.setUpEnableCoreMIDIBlock { [weak self] isEnabled in
             guard let this = self else { return }
             this.coreMIDIIsActive = isEnabled
-            print("CoreMIDI Send Enabled: \(isEnabled)")
+            AKLog("CoreMIDI Send Enabled: \(isEnabled)")
         }
     }
 
@@ -91,7 +91,7 @@ class AudiobusCompatibleSequencer {
     // MARK: - Handling NoteOn and NoteOff Msgs
     fileprivate func setUpCallBackFunctions(channel: Int) -> AKCallbackInstrument {
         return  AKCallbackInstrument { [weak self] status, note, velocity in
-            guard let this = self else { return}
+            guard let this = self else { return }
             switch status {
             case .noteOn:
                 this.noteOn(midiSendPort: this.ports[channel], status: status, note: note, velocity: velocity, channel: MIDIChannel(channel))
@@ -100,7 +100,7 @@ class AudiobusCompatibleSequencer {
                 this.noteOff(midiSendPort: this.ports[channel], status: status, note: note, velocity: velocity, channel: MIDIChannel(channel))
                 this.displayDelegate?.flashNoteOnDisplay(index: channel, noteOn: false)
             default:
-                print("other MIDI status msg sent")
+                AKLog("other MIDI status msg sent")
             }
         }
     }

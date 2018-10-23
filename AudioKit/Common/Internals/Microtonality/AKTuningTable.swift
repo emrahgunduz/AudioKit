@@ -33,7 +33,7 @@
 
 @objc open class AKTuningTable: AKTuningTableBase {
 
-    @objc internal var masterSet = [Frequency]()
+    @objc private(set) public var masterSet = [Frequency]()
 
     /// Note number for standard reference note
     @objc public var middleCNoteNumber: MIDINoteNumber = 60 {
@@ -204,5 +204,11 @@
             }
         }
         //AKLog("etnn dictionary:\(etNNDictionary)")
+    }
+
+    /// Renders and returns the masterSet values as an array of cents
+    @objc public func masterSetInCents() -> [Cents] {
+        let cents = masterSet.map({ log2($0) * 1_200 })
+        return cents
     }
 }
