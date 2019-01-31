@@ -9,6 +9,7 @@
 extension AKPlayer {
     /// Play entire file right now
     @objc public func play() {
+        AKLog("PLAY")
         play(from: startTime, to: endTime, at: nil, hostTime: nil)
     }
 
@@ -54,7 +55,7 @@ extension AKPlayer {
     }
 
     @objc public func resume() {
-        guard let pauseTime = pauseTime else {
+        guard let pauseTime = self.pauseTime else {
             play()
             return
         }
@@ -62,6 +63,8 @@ extension AKPlayer {
         playerNode.stop()
         play(from: pauseTime)
         AKLog("Resuming at \(pauseTime)")
+
+        self.pauseTime = nil
     }
 
     /// Stop playback and cancel any pending scheduled playback or completion events
@@ -188,7 +191,7 @@ extension AKPlayer {
 
         let totalFrames = (audioFile.length - startFrame) - (audioFile.length - endFrame)
         guard totalFrames > 0 else {
-            AKLog("totalFrames to play is \(totalFrames). Bailing.")
+            AKLog("Unable to schedule file. totalFrames to play is \(totalFrames). audioFile.length is", audioFile.length)
             return
         }
 

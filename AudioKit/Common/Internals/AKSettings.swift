@@ -230,11 +230,11 @@ extension AKSettings {
         if ❗️AKSettings.disableAVAudioSessionCategoryManagement {
             do {
                 try AKTry {
-                  if #available(iOS 10.0, *) {
-                    try session.setCategory(category.avCategory, mode: .default, options: options)
-                  } else {
-                    session.perform(NSSelectorFromString("setCategory:error:"), with: category.avCategory)
-                  }
+                   if #available(iOS 10.0, *) {
+                        try session.setCategory(category.avCategory, mode: .default, options: options)
+                    } else {
+                        session.perform(NSSelectorFromString("setCategory:error:"), with: category.avCategory)
+                    }
                 }
             } catch let error as NSError {
                 AKLog("Error: \(error) Cannot set AVAudioSession Category to \(category) with options: \(options)")

@@ -6,9 +6,9 @@
 //  Copyright © 2018 AudioKit. All rights reserved.
 //
 
-/// Stereo Chorus
+/// Sampler
 ///
-@objc open class AKSampler: AKPolyphonicNode, AKComponent, AKInput {
+@objc open class AKSampler: AKPolyphonicNode, AKComponent {
     public typealias AKAudioUnitType = AKSamplerAudioUnit
     /// Four letter unique description of the node
     public static let ComponentDescription = AudioComponentDescription(instrument: "AKss")
@@ -40,6 +40,8 @@
     fileprivate var loopThruReleaseParameter: AUParameter?
     fileprivate var monophonicParameter: AUParameter?
     fileprivate var legatoParameter: AUParameter?
+    fileprivate var keyTrackingParameter: AUParameter?
+    fileprivate var filterEnvelopeVelocityScalingParameter: AUParameter?
 
     /// Ramp Duration represents the speed at which parameters are allowed to change
     @objc open dynamic var rampDuration: Double = AKSettings.rampDuration {
@@ -282,12 +284,29 @@
         }
     }
 
+    /// keyTrackingFraction (-2.0 to +2.0, normal range 0.0 to 1.0)
+    @objc open dynamic var keyTrackingFraction: Double = 1.0 {
+        willSet {
+            if keyTrackingFraction != newValue {
+                internalAU?.keyTrackingFraction = newValue
+            }
+        }
+    }
+
+    /// filterEnvelopeVelocityScaling (fraction 0.0 to 1.0)
+    @objc open dynamic var filterEnvelopeVelocityScaling: Double = 0.0 {
+        willSet {
+            if filterEnvelopeVelocityScaling != newValue {
+                internalAU?.filterEnvelopeVelocityScaling = newValue
+            }
+        }
+    }
+
     // MARK: - Initialization
 
     /// Initialize this sampler node
     ///
     /// - Parameters:
-    ///   - input: AKNode whose output will be processed (not used)
     ///   - masterVolume: 0.0 - 1.0
     ///   - pitchBend: semitones, signed
     ///   - vibratoDepth: semitones, typically less than 1.0
@@ -307,9 +326,10 @@
     ///   - loopThruRelease: if true, sample will continue looping after key release
     ///   - isMonophonic: true for mono, false for polyphonic
     ///   - isLegato: (mono mode onl) if true, legato notes will not retrigger
+    ///   - keyTracking: -2.0 - 2.0, 1.0 means perfect key tracking, 0.0 means none
+    ///   - filterEnvelopeVelocityScaling: fraction, 0.0 - 1.0
     ///
     @objc public init(
-        _ input: AKNode? = nil,
         masterVolume: Double = 1.0,
         pitchBend: Double = 0.0,
         vibratoDepth: Double = 0.0,
@@ -328,7 +348,9 @@
         glideRate: Double = 0.0,
         loopThruRelease: Bool = true,
         isMonophonic: Bool = false,
-        isLegato: Bool = false  ) {
+        isLegato: Bool = false,
+        keyTracking: Double = 1.0,
+        filterEnvelopeVelocityScaling: Double = 0.0) {
 
         self.masterVolume = masterVolume
         self.pitchBend = pitchBend
@@ -349,6 +371,8 @@
         self.loopThruRelease = loopThruRelease
         self.isMonophonic = isMonophonic
         self.isLegato = isLegato
+        self.keyTrackingFraction = keyTracking
+        self.filterEnvelopeVelocityScaling = filterEnvelopeVelocityScaling
 
         AKSampler.register()
 
@@ -362,8 +386,6 @@
             strongSelf.avAudioUnit = avAudioUnit
             strongSelf.avAudioNode = avAudioUnit
             strongSelf.internalAU = avAudioUnit.auAudioUnit as? AKAudioUnitType
-
-            input?.connect(to: self!)
         }
 
         guard let tree = internalAU?.parameterTree else {
@@ -390,6 +412,8 @@
         self.loopThruReleaseParameter = tree["loopThruRelease"]
         self.monophonicParameter = tree["monophonic"]
         self.legatoParameter = tree["legato"]
+        self.keyTrackingParameter = tree["keyTracking"]
+        self.filterEnvelopeVelocityScalingParameter = tree["filterEnvelopeVelocityScaling"]
 
         token = tree.token(byAddingParameterObserver: { [weak self] _, _ in
 
@@ -422,6 +446,8 @@
         self.internalAU?.setParameterImmediately(.loopThruRelease, value: loopThruRelease ? 1.0 : 0.0)
         self.internalAU?.setParameterImmediately(.monophonic, value: isMonophonic ? 1.0 : 0.0)
         self.internalAU?.setParameterImmediately(.legato, value: isLegato ? 1.0 : 0.0)
+        self.internalAU?.setParameterImmediately(.keyTrackingFraction, value: keyTracking)
+        self.internalAU?.setParameterImmediately(.filterEnvelopeVelocityScaling, value: filterEnvelopeVelocityScaling)
     }
 
     @objc open func loadAKAudioFile(from sampleDescriptor: AKSampleDescriptor, file: AKAudioFile) {
@@ -456,6 +482,10 @@
 
     @objc open func unloadAllSamples() {
         internalAU?.unloadAllSamples()
+    }
+
+    @objc open func setNoteFrequency(noteNumber: MIDINoteNumber, frequency: Double) {
+        internalAU?.setNoteFrequency(noteNumber: Int32(noteNumber), noteFrequency: Float(frequency))
     }
 
     @objc open func buildSimpleKeyMap() {

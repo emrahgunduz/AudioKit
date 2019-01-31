@@ -24,8 +24,8 @@ public:
 
     AKWaveTableDSPKernel() {}
 
-    void init(int _channels, double _sampleRate) override {
-        AKSoundpipeKernel::init(_channels, _sampleRate);
+    void init(int channelCount, double sampleRate) override {
+        AKSoundpipeKernel::init(channelCount, sampleRate);
 
         sp_tabread_create(&tabread1);
         sp_tabread_create(&tabread2);
@@ -34,6 +34,14 @@ public:
         volumeRamper.init();
     }
 
+
+    void destroy() {
+        sp_tabread_destroy(&tabread1);
+        sp_tabread_destroy(&tabread2);
+        sp_ftbl_destroy(&ftbl1);
+        sp_ftbl_destroy(&ftbl2);;
+        AKSoundpipeKernel::destroy();
+    }
     void start() {
         started = true;
 
@@ -77,14 +85,6 @@ public:
         if (loadCompletionHandler != nil){
             loadCompletionHandler();
         }
-    }
-
-    void destroy() {
-        sp_tabread_destroy(&tabread1);
-        sp_tabread_destroy(&tabread2);
-        sp_ftbl_destroy(&ftbl1);
-        sp_ftbl_destroy(&ftbl2);
-        AKSoundpipeKernel::destroy();
     }
 
     void reset() {
